@@ -11,10 +11,17 @@ namespace EntityFishingClient ;
  */
 require 'vendor/autoload.php';
 
-$document = (new EntityFactory() )->fromCliArguments($argv) ; 
+try{
+    $document = (new EntityFactory() )->fromCliArguments($argv) ; 
 
-$client = new NerdClient(new NerdConfiguration() , new NerdDisambiguationRepository(), new Logger() );
+    $client = new NerdClient(new NerdConfiguration() , new NerdDisambiguationRepository(), new Logger() );
 
-$disambiguation = $client->disambiguate(new NerdDisambiguation(), $document, new NerdPresenter() ) ;
+    $disambiguation = $client->disambiguate(new NerdDisambiguation(), $document, new NerdPresenter() ) ; 
+    
+} catch (\Exception $ex) {
+
+    (new Logger() )->debug( $ex->getMessage() ) ;
+}
+
 
 
