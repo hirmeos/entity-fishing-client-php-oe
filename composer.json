@@ -1,0 +1,23 @@
+{	
+    "name": "openedition/entity-fishing-client",
+    "description": "Entity Fishing Client",
+    "authors": [
+    {
+      "name": "Alexandre Vinogradov",
+      "email": "alexandre.vinogradov@openedition.org"
+    }
+  ],
+
+    "type": "library",
+    "version": "1.0.0",
+    "require": {
+        "php": ">=5.6.29",
+        "psr/http-message": "dev-master",
+        "guzzlehttp/psr7": "dev-master"
+    },
+    "autoload": {
+        "psr-4": {
+            "EntityFishingClient\\":        "src"
+        }
+    }
+}
