@@ -18,6 +18,6 @@ class Logger
     //put your code here
     public function debug($str)
     {
-        echo $str ;
+        echo $str ."\n" ;
     }
 }
