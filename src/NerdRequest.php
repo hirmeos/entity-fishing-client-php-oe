@@ -9,7 +9,7 @@ namespace EntityFishingClient ;
 
 use GuzzleHttp\Psr7\ServerRequest ;
 use GuzzleHttp\Psr7\MultipartStream ;
-use GuzzleHttp\Psr7\Request ;
+
 /**
  * Description of NerdRequest
  *
@@ -45,6 +45,31 @@ class NerdRequest extends ServerRequest
     public function getBoundary()
     {
         return $this->boundary ;
+    }
+    
+    public function getText()
+    {
+        $processSentences = $this->getAttribute(EntityFishing::PROCESS_SENTENCE, false) ;
+        
+        $text = $this->getAttribute(EntityFishing::TEXT, "" );
+        
+        $result = "" ;
+        
+        if($processSentences != false){
+            
+            $sentences = $this->getAttribute(EntityFishing::SENTENCES);
+            
+            foreach($processSentences as $key){
+                
+                $sentence = $sentences[$key] ;
+                 
+                $result .= mb_substr($text, $sentence->offsetStart,$sentence->offsetEnd) ;
+            }
+            
+            return $result ;
+        }
+        
+        return $text ;
     }
     
     

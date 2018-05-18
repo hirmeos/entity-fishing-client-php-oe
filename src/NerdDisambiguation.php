@@ -5,36 +5,23 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-namespace EntityFishingClient;
+namespace OpenEdition\EntityFishingClient;
 /**
  * Description of NerdDisambiguation
  *
  * @author vinogradov
  */
-class NerdDisambiguation extends GenericEntity
+interface NerdDisambiguation 
 {
-    //put your code here
-    const FLAG_DISAMBIGUATION_COMPLETED = 1 ;
+   
     
-    protected $entities ;
-    protected $requests_done = 0;
+    public function getEntities() ;
     
-    public function getEntities()
-    {
-        $json = json_decode($this->entities);
-        
-        if ($json !== null){
-            
-            return $json ;
-        }
-        
-        return array();
-    }
     
-    public function setEntities( $entities )
-    {
-        $this->entities = $entities ;
-    }
+    public function setEntities( $entities ) ;
+    
+    
+    public function updateProgress($requestsDone, $processTime) ;
     
     
     

@@ -1,6 +1,6 @@
 <?php
 
-namespace EntityFishingClient ;
+namespace OpenEdition\EntityFishingClient ;
 
 use Psr\Http\Message\RequestInterface ;
 use Psr\Http\Message\ResponseInterface ;
@@ -141,5 +141,9 @@ class HttpClient {
         }
         return false;
     }
+    
+}
+class HttpException extends \Exception
+{
     
 }
