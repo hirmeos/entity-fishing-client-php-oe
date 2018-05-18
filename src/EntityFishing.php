@@ -28,7 +28,7 @@ class EntityFishing
     const PROCESS_SENTENCE = "processSentence" ;
     const SENTENCES = "sentences" ;
     
-    const MINIMUM_TEXT_SIZE = 11 ;
+    protected $minimumTextSize = 11 ;
     
     protected $configuration ;
     protected $logger ;
@@ -84,10 +84,7 @@ class EntityFishing
         }
                
         $this->logger->info("document disambiguated in " . $this->timer->getElapsed() . " secs" );
-                                    
-        
-        $disambiguation->setModificationDateToNow() ;
-            
+                                                
         return $disambiguation ;
     }
     
@@ -153,7 +150,7 @@ class EntityFishing
         } 
         catch (EntityFishingException $ex) {
                         
-            $requests = array( $this->createWholeTextRequest( $document  ) ) ;   // taking whole text
+            $requests = [ $this->createWholeTextRequest( $document ) ] ;   // taking whole text
                                       
         }
 
@@ -205,13 +202,12 @@ class EntityFishing
     
     protected function createRequest()
     {
-        $Request = new NerdRequest();
-        
-        return $Request->withAttribute(EntityFishing::LANGUAGE,(object) array("lang" => "en" ) )
-                        ->withAttribute(EntityFishing::SENTENCES, array() )                      
+       
+        return (new NerdRequest() )->withAttribute(EntityFishing::LANGUAGE,(object) ["lang" => "en"] )
+                        ->withAttribute(EntityFishing::SENTENCES, [] )                      
                         ->withAttribute(EntityFishing::NBEST,  false )
                         ->withAttribute(EntityFishing::CUSTOMISATION, "generic" )
-                        ->withAttribute(EntityFishing::ENTITIES, array() )
+                        ->withAttribute(EntityFishing::ENTITIES, [] )
                         ->withAttribute("mentions",["ner","wikipedia"])
                         ->withHeader("Content-Type", "multipart/form-data; boundary=". $Request->getBoundary() . "")
                         ->withMethod("post") 
@@ -223,7 +219,7 @@ class EntityFishing
     {
        
         try{
-             if(strlen($entity->getText() ) < self::MINIMUM_TEXT_SIZE){
+             if(strlen($entity->getText() ) < $this->minimumTextSize){
             
                 throw new EntityFishingException("text " . $entity->getText() ." is too short");
             }           
@@ -241,7 +237,7 @@ class EntityFishing
                        
         try{
                         
-            $Request = $Request->withAttribute(EntityFishing::LANGUAGE, (object) array("lang" => $entity->getLanguage() )  ) ;
+            $Request = $Request->withAttribute(EntityFishing::LANGUAGE, (object) ["lang" => $entity->getLanguage()]  ) ;
             
         } 
         catch (\Exception $ex) {
@@ -265,11 +261,11 @@ class EntityFishing
              
         }
         
-        $requests = array() ;
+        $requests = [] ;
        
         $wholeText = "";
         
-        $sentences = array() ;
+        $sentences = [] ;
         
         $i = 0;
         
@@ -279,29 +275,26 @@ class EntityFishing
                        
             $wholeText .= $text ;
             
-            if(strlen($text) < self::MINIMUM_TEXT_SIZE){
+            if(strlen($text) < $this->minimumTextSize){
                  
                  continue ;
             }          
                        
-            $sentences[] = (object) array("offsetStart" => $offsetStart,
-                                          "offsetEnd" => strlen( utf8_decode($wholeText) )  
-                                        );
-                     
-             
+            $sentences[] = (object) ["offsetStart" => $offsetStart,"offsetEnd" => strlen( utf8_decode($wholeText) ) ] ;  
+                                  
             $Request =  $this->createRequest()->withUri( new Uri( $this->configuration->getDisambiguationEndpoint() ) )
                                              ->withAttribute(EntityFishing::TEXT, $text);
             
             if($withContext){
                 
                 $Request = $Request->withAttribute(EntityFishing::SENTENCES, $sentences )
-                                   ->withAttribute( EntityFishing::PROCESS_SENTENCE, array( $i++ ) )
+                                   ->withAttribute( EntityFishing::PROCESS_SENTENCE, [ $i++ ] )
                                    ->withAttribute(EntityFishing::TEXT, $wholeText);
             }
                                                                                                              
             try{
                                           
-                  $Request = $Request->withAttribute(EntityFishing::LANGUAGE, (object) array("lang" => $entity->getLanguage() )  ) ;
+                  $Request = $Request->withAttribute(EntityFishing::LANGUAGE, (object) ["lang" => $entity->getLanguage() ] ) ;
             
                 } 
                 catch (\Exception $ex) {
