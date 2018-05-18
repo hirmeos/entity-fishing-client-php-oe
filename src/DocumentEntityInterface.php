@@ -15,11 +15,7 @@ namespace OpenEdition\EntityFishingClient;
  */
 interface DocumentEntityInterface
 {
-    //put your code here
-    public function __get($field) ;
-    
-    public function query(SolrQueryBuilder $query);
-    
+      
     public function getTitle();
     
     public function getUrl();
