@@ -28,8 +28,6 @@ class EntityFishing
     const PROCESS_SENTENCE = "processSentence" ;
     const SENTENCES = "sentences" ;
     
-    protected $minimumTextSize = 11 ;
-    
     protected $configuration ;
     protected $logger ;
     protected $httpClient ;
@@ -219,7 +217,7 @@ class EntityFishing
     {
        
         try{
-             if(strlen($entity->getText() ) < $this->minimumTextSize){
+             if(strlen($entity->getText() ) < $this->configuration->getMinimumTextSize() ){
             
                 throw new EntityFishingException("text " . $entity->getText() ." is too short");
             }           
@@ -275,7 +273,7 @@ class EntityFishing
                        
             $wholeText .= $text ;
             
-            if(strlen($text) < $this->minimumTextSize){
+            if(strlen($text) < $this->configuration->getMinimumTextSize() ){
                  
                  continue ;
             }          

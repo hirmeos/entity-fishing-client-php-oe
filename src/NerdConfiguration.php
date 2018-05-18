@@ -43,6 +43,11 @@ class NerdConfiguration
                     );
     }
     
+    public function getMinimumTextSize()
+    {
+        return 11 ;
+    }
+    
     private function getBaseUri()
     {
         
