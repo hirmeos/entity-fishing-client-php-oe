@@ -30,81 +30,80 @@ class EntityFishing
     
     protected $configuration ;
     protected $logger ;
-    protected $httpClient ;
     protected $timer ;
       
-    public function __construct(NerdConfiguration $configuration,  \Psr\Log\LoggerInterface $logger, HttpClient $client, Timer $timer)
-    {
-        
+    public function __construct(NerdConfiguration $configuration,  \Psr\Log\LoggerInterface $logger,  Timer $timer)
+    {       
         $this->configuration = $configuration ;
-
-        $this->logger = $logger ;
-        
-        $this->httpClient = $client ;
-        
+        $this->logger = $logger ;          
         $this->timer = $timer ;
     }
     
-    public function process(NerdDisambiguation $disambiguation, DocumentEntityInterface $document)
+    public function process($html, $language = "en"): array
     {
-        $this->validateDocument( $document ) ;
-         
-        $this->timer->start() ;
+        if( !in_array( $language, $this->configuration->supportedLanguages ) ){
+                    
+            throw new EntityFishingException("document can not be processed : unsupported language ") ;
+                    
+        }      
+        $this->timer = $this->timer->started() ;
         
-        $requests = $this->createRequests( $document ); 
+        $requests = $this->createParagraphsRequests( $this->getParagraphs($html), $language ); 
                                          
         $currentEntities = [] ;
-        
-        $this->logger->info("Interrogating Nerd API for " . $document->getUrl() . " ..." );
-               
-        foreach($requests as $key => $request){
+        $totalEntities = [];
+                          
+        foreach( $requests as $key => $request){
             
             try{
-                    $this->checkRunningTime() ; // stops fishing if timeout
+                    if( !empty( $this->configuration->timeout) && ($this->timer->seconds() > $this->configuration->timeout ) ){
+                        
+                        throw new EntityFishingException( "Requesting exceeded timeout" ) ;                      
+                    }
                     
-                    //$this->logRequest($request, $key) ;
+                    $json = \json_decode( $this->request($request)->getBody()->getContents() ) ;
+                                        
+                    if(!is_null($json) && isset($json->entities)){
+                                                         
+                        $currentEntities = $json->entities ;
                     
-                    $currentEntities = $this->fishParagraph($request, $disambiguation) ;
-                                                                                                                                                                                              
-                    $disambiguation->updateProgress( $key + 1, $this->timer->getElapsed( false ) ) ;
-                                      
-                    $this->logProgress($disambiguation, $requests, $currentEntities, $key)   ;                                                                              
-                                                                                                                                                             
+                        $totalEntities = array_merge($totalEntities, $currentEntities ) ;
+                                                                                                                                                                                                                              
+                        $this->logProgress($requests, $currentEntities, $totalEntities, $key)  ; 
+                    }
                 } 
-                catch (HttpException $ex) { //  pb access Nerd Service or getting entities from response   
+                catch (\Exception $ex) { //  pb access Nerd Service or getting entities from response   
                     
-                     $this->logger->warn( "[untreatable text: ] " . $request->getText() ) ;
-                                     
-                }
-                catch(JsonException $ex){
-                    
-                }                           
-        }
-               
-        $this->logger->info("document disambiguated in " . $this->timer->getElapsed() . " secs" );
-                                                
-        return $disambiguation ;
+                     $this->logger->warn( $ex->getMessage()) ;                                    
+                }                          
+        }   
+        
+        $this->logger->info("document disambiguated in " . (string) $this->timer  );
+        
+        return $totalEntities ;                            
     }
     
-    protected function fishParagraph(NerdRequest $request, NerdDisambiguation $disambiguation)
+    protected function getParagraphs($html): array
     {
-        $Response = $this->request( $request ) ;
-                    
-        $disambiguation->appendEntities( $Response->read( EntityFishing::ENTITIES ) );
+        $dom = new \DOMDocument("1.0", "UTF-8") ;
         
-        return $Response->read( EntityFishing::ENTITIES ) ;
+        try{
+            $dom->loadHTML( mb_convert_encoding( $html, 'HTML-ENTITIES', 'UTF-8' ) );
+        } 
+        catch (\DOMException $ex) {
+            
+            return [] ;
+        }                      
+        return \array_map(function(\DOMNode $node){
+           
+            $str = mb_convert_encoding($node->nodeValue, "HTML-ENTITIES", "UTF-8" );           
+            $str = str_replace("&rsquo;", "'", $str);   
+            return html_entity_decode( $str, ENT_COMPAT, 'UTF-8') ;
+        
+        }, iterator_to_array( $dom->getElementsByTagName("p") ) ) ;          
     }
-    
-    protected function fishParagraphInContext(NerdRequest $request, NerdDisambiguation $disambiguation, $previousEntities)
-    {
-        $Response = $this->request( $request->withAttribute( EntityFishing::ENTITIES, $previousEntities )  );
-        
-        $disambiguation->setData( $Response->read( EntityFishing::ENTITIES ) ) ;
-        
-        return array_slice( $Response->read( EntityFishing::ENTITIES ), count($previousEntities) ) ;
-    }
-    
-    protected function logProgress(NerdDisambiguation $disambiguation, $requests = [], $currentEntities = [], $index)
+       
+    protected function logProgress($requests = [], $currentEntities = [], $totalEntities, $index)
     {
         $str = "entities: ";
                     
@@ -115,196 +114,69 @@ class EntityFishing
                     
         $this->logger->debug($str ) ;
         
-        $this->logger->info("entities: "
-                             . (string) (count( $currentEntities) )  
-                             . " / total: " . count( $disambiguation->getEntities() )
-                             . " / " . (string) ( count($requests) - $index -1 ) . " requests left"
-                             . "  / duration: " . round($this->timer->getElapsed( false ),1 ) 
-                             . " /total size: ". $disambiguation->getDataSize()
-                                         
-                             );
+        $this->logger->info("entities: " . (string) (count( $currentEntities) )  . " / total: " . count( $totalEntities)
+                             . " / " . (string) ( count($requests) - $index -1 ) . " requests left" );
     }
     
-    protected function logRequest(NerdRequest $request, $key)
-    {
-        $this->logger->debug( "[Paragraph " . (string) ($key+1) . "] " . $request->getText() ) ;
-    }
     
-    protected function checkRunningTime()
+    protected function request(\Psr\Http\Message\ServerRequestInterface $request): \Psr\Http\Message\ResponseInterface
     {
-        if( $this->configuration->has("timeout") && ($this->timer->getElapsed( false ) > $this->configuration->__get("timeout") ) ){
-                        
-            throw new EntityFishingException( "Requesting exceeded timeout" ) ;
-                        
-        }
-    }
-    
-    protected function createRequests(DocumentEntityInterface $document)
-    {
-        try{
-            
-             $requests = $this->createParagraphsRequests($document ) ;  // dividing in paragraphs
-                     
-        } 
-        catch (EntityFishingException $ex) {
-                        
-            $requests = [ $this->createWholeTextRequest( $document ) ] ;   // taking whole text
-                                      
-        }
-
-        return $requests ;
-    }
-    
-    protected function request(ServerRequestInterface $Request)
-    {
-  
-        $Response = $this->httpClient->request( $Request, new JsonResponse() );
+        $client = new \GuzzleHttp\Client();
         
-        if( $Response->getStatusCode() != StatusCode::OK ){
-            
-            $this->logger->warn("Nerd API returned " . $Response->getStatusCode() . " status code " );
-            
-            throw new HttpException( $Response->getBody(), $Response->getStatusCode() );
-        }
-        
-        
-        return $Response ;
-    }
-    
-    protected function validateDocument(DocumentEntityInterface $document)
-    {
-        try{
-                          
-            if( !in_array( $document->getLanguage(), $this->configuration->getSupportedLanguages() ) ){
-                    
-                throw new EntityFishingException("document " . $document->getUrl() . " can not be processed : unsupported language " . $document->getLanguage() ) ;
-                    
-            }
-           
-        } catch (\Exception $ex) {
-            
-            // if no language it is English by default in request
-        }
-        
-        try{
-            
-            $document->getText();
-            
-        } catch (\Exception $ex) {
-            
-            throw new EntityFishingException("document " . $document->getUrl() . " can not be processed : no text " ) ;
-        }
+        $json = \json_encode((object) $request->getAttributes() ) ;
+              
+        return $client->request('POST', $this->configuration->getDisambiguationEndpoint() , [
+           'multipart' => [
+                [
+                'name'     => 'query',
+                'contents' => $json,
+                'headers'  => [
+                    'accept' => 'application/json'
+                    ]
+                ]
+            ]
+        ]);
         
     }
-    
-    
-    protected function createRequest()
-    {
-       
-        return (new NerdRequest() )->withAttribute(EntityFishing::LANGUAGE,(object) ["lang" => "en"] )
+         
+    protected function createRequest() : \Psr\Http\Message\ServerRequestInterface
+    {    
+        return (new \GuzzleHttp\Psr7\ServerRequest('POST',$this->configuration->getDisambiguationEndpoint()) )
+                        ->withAttribute(EntityFishing::LANGUAGE,(object) ["lang" => "en"] )
                         ->withAttribute(EntityFishing::SENTENCES, [] )                      
                         ->withAttribute(EntityFishing::NBEST,  false )
                         ->withAttribute(EntityFishing::CUSTOMISATION, "generic" )
                         ->withAttribute(EntityFishing::ENTITIES, [] )
-                        ->withAttribute("mentions",["ner","wikipedia"])
-                        ->withHeader("Content-Type", "multipart/form-data; boundary=". $Request->getBoundary() . "")
-                        ->withMethod("post") 
-               ;
+                        ->withAttribute("mentions",["ner","wikipedia"]) ;                                 
     }
-      
+          
     
-    protected function createWholeTextRequest(DocumentEntityInterface $entity)
-    {
-       
-        try{
-             if(strlen($entity->getText() ) < $this->configuration->getMinimumTextSize() ){
-            
-                throw new EntityFishingException("text " . $entity->getText() ." is too short");
-            }           
-            
-            $Request =  $this->createRequest()->withUri( new Uri( $this->configuration->getDisambiguationEndpoint() ) )
-                                              ->withAttribute(EntityFishing::TEXT, $entity->getText() );
-                                            
-            
-        } 
-        catch (\Exception $ex) {
-            
-            throw new EntityFishingException($ex->getMessage() );
-            
-        }
-                       
-        try{
-                        
-            $Request = $Request->withAttribute(EntityFishing::LANGUAGE, (object) ["lang" => $entity->getLanguage()]  ) ;
-            
-        } 
-        catch (\Exception $ex) {
-        }
-        
-        return $Request ;     
-        
-    }
-    
-    protected function createParagraphsRequests(DocumentEntityInterface $entity, $withContext = false)
-    {
-      
-        try{
-            
-            $paragraphs = $entity->getParagraphs() ;
-            
-        } 
-        catch (\Exception $ex) {
-            
-             throw new EntityFishingException("getting paragraphs failed : " . $ex->getMessage() );
-             
-        }
-        
-        $requests = [] ;
-       
-        $wholeText = "";
-        
-        $sentences = [] ;
-        
+    protected function createParagraphsRequests($paragraphs, $language, $withContext = false): array
+    {           
+        $requests = [] ;      
+        $wholeText = "";       
+        $sentences = [] ;     
         $i = 0;
         
         foreach($paragraphs as $text){
             
-            $offsetStart = strlen( utf8_decode($wholeText) );
+           $offsetStart = strlen( utf8_decode($wholeText) );
                        
             $wholeText .= $text ;
             
-            if(strlen($text) < $this->configuration->getMinimumTextSize() ){
+            if(strlen($text) < $this->configuration->minimumtextSize){
                  
                  continue ;
-            }          
-                       
-            $sentences[] = (object) ["offsetStart" => $offsetStart,"offsetEnd" => strlen( utf8_decode($wholeText) ) ] ;  
-                                  
-            $Request =  $this->createRequest()->withUri( new Uri( $this->configuration->getDisambiguationEndpoint() ) )
-                                             ->withAttribute(EntityFishing::TEXT, $text);
-            
+            }                                                    
+            $request =  $this->createRequest()->withAttribute(EntityFishing::TEXT, $text)
+                                             ->withAttribute(EntityFishing::LANGUAGE, (object) ["lang" => $language] );         
             if($withContext){
                 
-                $Request = $Request->withAttribute(EntityFishing::SENTENCES, $sentences )
-                                   ->withAttribute( EntityFishing::PROCESS_SENTENCE, [ $i++ ] )
+                $request = $request->withAttribute(EntityFishing::SENTENCES, (object) ["offsetStart" => $offsetStart, "offsetEnd" => strlen( utf8_decode($wholeText) )  ] )
+                                   ->withAttribute( EntityFishing::PROCESS_SENTENCE, array( $i++ ) )
                                    ->withAttribute(EntityFishing::TEXT, $wholeText);
-            }
-                                                                                                             
-            try{
-                                          
-                  $Request = $Request->withAttribute(EntityFishing::LANGUAGE, (object) ["lang" => $entity->getLanguage() ] ) ;
-            
-                } 
-                catch (\Exception $ex) {
-                }
-              
-            $requests[] = $Request ;
-            
-        }
-        
-        if(count($requests) == 0){
-            
-            throw new EntityFishingException(" document can not be divided in paragraphs " );
+            }                                                                                                                     
+            $requests[] = $request ;     
             
         }
        

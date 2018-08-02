@@ -1,12 +1,6 @@
- <?php
-
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+<?php
+ 
 namespace OpenEdition\EntityFishingClient ;
-
 
 /**
  * Description of NerdConfiguration
@@ -16,41 +10,29 @@ namespace OpenEdition\EntityFishingClient ;
 class NerdConfiguration
 {
     
-    public function __construct()
+    public $minimumtextSize = 11 ;
+    protected $uri_disambiguation ;
+    public $entityTypes = ["PERSON","LOCATION","PERSON_TYPE",
+                            "INSTALLATION","MEDIA","AWARD","ORGANISATION",
+                           "CREATION","WEBSITE","INSTITUTION","BUSINESS",
+                           "EVENT","ACRONYM","NATIONAL","ANIMAL",
+                           "IDENTIFIER", "ARTIFACT" ,"PERIOD", "SUBSTANCE",
+                           "PLANT", "SPORT_TEAM", "CONCEPT", "CONCEPTUAL",
+                            "UNKNOWN"] ;
+    public $supportedLanguages = ["fr","en"];
+    public $timeout ;
+   
+    public function __construct( $config = [] )
     {
-        
+        foreach($config as $key => $value){
+            
+            $this->{$key} = $value ;
+        }
     }
     
     public function getDisambiguationEndpoint()
     {
-        return  $this->getBaseUri() . "nerd/disambiguate" ;
-    }
-    
-    public function getKnowledgeBaseEndpoint()
-    {
-        return  $this->getBaseUri() . "nerd/service/kb/concept" ;
-    }
-    
-    public function getEntityTypes()
-    {
-        return array("PERSON","LOCATION","PERSON_TYPE",
-                    "INSTALLATION","MEDIA","AWARD","ORGANISATION",
-                    "CREATION","WEBSITE","INSTITUTION","BUSINESS",
-                    "EVENT","ACRONYM","NATIONAL","ANIMAL",
-                    "IDENTIFIER", "ARTIFACT" ,"PERIOD", "SUBSTANCE",
-                    "PLANT", "SPORT_TEAM", "CONCEPT", "CONCEPTUAL",
-                    "UNKNOWN"
-                    );
-    }
-    
-    public function getMinimumTextSize()
-    {
-        return 11 ;
-    }
-    
-    private function getBaseUri()
-    {
-        
+        return  $this->uri_disambiguation ;
     }
     
 }
