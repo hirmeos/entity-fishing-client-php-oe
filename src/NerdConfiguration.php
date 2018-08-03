@@ -11,7 +11,8 @@ class NerdConfiguration
 {
     
     public $minimumtextSize = 11 ;
-    protected $uri_disambiguation ;
+    protected $uri_fishing ;
+    protected $uri_kid ;
     public $entityTypes = ["PERSON","LOCATION","PERSON_TYPE",
                             "INSTALLATION","MEDIA","AWARD","ORGANISATION",
                            "CREATION","WEBSITE","INSTITUTION","BUSINESS",
@@ -30,9 +31,22 @@ class NerdConfiguration
         }
     }
     
-    public function getDisambiguationEndpoint()
+    public function uriFishing(): string
     {
-        return  $this->uri_disambiguation ;
+        if(empty($this->uri_fishing)){
+            
+            throw new EntityFishingException("uri_disambiguation is undefined");
+        }
+        return  $this->uri_fishing ;
+    }
+    
+    public function uriKid(): string
+    {
+        if(empty($this->uri_kid)){
+            
+            throw new EntityFishingException("uri_kid is undefined");
+        }
+        return  $this->uri_kid ;
     }
     
 }
